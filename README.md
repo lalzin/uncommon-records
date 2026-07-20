@@ -3,7 +3,7 @@
 Réécriture de l'application Flask `uncommon-records` en **Next.js 14 (App Router, TypeScript)**,
 déployable sur **Vercel**, avec :
 
-- **Neon** (Postgres serverless) à la place de SQLite — via **Prisma**
+- **Supabase** (Postgres) à la place de SQLite — via **Prisma**
 - **S3 / Cloudflare R2** à la place du dossier `uploads/` local — gros fichiers audio uploadés
   en **direct-to-bucket** via URL présignée (contourne la limite de 4,5 Mo des fonctions serverless)
 - **JWT** (`jose`) + **bcrypt** pour l'auth, identique au comportement Flask
@@ -17,7 +17,7 @@ résolus ainsi :
 
 | Contrainte Vercel | Original (Flask) | Ici |
 |---|---|---|
-| Pas de FS persistant pour la DB | SQLite `instance/uncommon.db` | Postgres Neon (`DATABASE_URL`) |
+| Pas de FS persistant pour la DB | SQLite `instance/uncommon.db` | Supabase Postgres (`DATABASE_URL`) |
 | Pas de FS persistant pour les fichiers | `uploads/` local | Bucket S3/R2 + URLs présignées |
 | Limite de taille du body serverless | upload audio 150 Mo en POST | upload direct navigateur → bucket |
 
@@ -53,7 +53,7 @@ uncommon-records-vercel/
 ```bash
 npm install
 cp .env.example .env.local      # puis renseigner les valeurs
-npx prisma db push              # crée le schéma sur Neon
+npx prisma db push              # crée le schéma sur Supabase
 npm run db:seed                 # admin + données de démo
 npm run dev                     # http://localhost:3000
 ```
@@ -62,14 +62,14 @@ npm run dev                     # http://localhost:3000
 
 Voir `.env.example`. Les essentielles :
 
-- `DATABASE_URL` (Neon **pooled**) + `DIRECT_URL` (Neon **direct**, pour les migrations)
+- `DATABASE_URL` (Supabase **transaction pooler** 6543) + `DIRECT_URL` (Supabase **session pooler** 5432)
 - `S3_*` : `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL`,
   et pour R2 : `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com` + `S3_REGION=auto`
 - `JWT_SECRET`, `FRONTEND_URL`, `MAIL_*`
 
 ## Déploiement Vercel
 
-1. **Neon** : créer un projet, récupérer les connection strings pooled + direct.
+1. **Supabase** : créer un projet, récupérer les connection strings (transaction + session pooler).
 2. **Bucket** : créer un bucket S3 (ou R2). Le rendre lisible publiquement OU servir via CDN, et
    renseigner `S3_PUBLIC_BASE_URL`. Configurer le **CORS** du bucket pour autoriser les `PUT`
    présignés depuis votre domaine (`PUT`, `GET`, headers `*`, origine = votre URL Vercel).
@@ -113,7 +113,7 @@ La base de démo (`instance/uncommon.db`, ~49 Ko) est négligeable : le seed la 
 Pour migrer une vraie base SQLite de prod :
 
 1. exporter les tables SQLite → CSV / SQL,
-2. importer dans Neon (mêmes noms de colonnes : voir `@map(...)` dans `schema.prisma`),
+2. importer dans Supabase (mêmes noms de colonnes : voir `@map(...)` dans `schema.prisma`),
 3. uploader les fichiers de `backend/uploads/**` vers le bucket en conservant les chemins
    `covers/…`, `events/…`, `avatars/…`, `audio/…` (les clés stockées en base correspondent).
 

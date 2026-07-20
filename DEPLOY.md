@@ -1,4 +1,4 @@
-# Déploiement — Neon + Cloudflare R2 + Vercel
+# Déploiement — Supabase + Cloudflare R2 + Vercel
 
 Guide pas-à-pas. Chaque valeur secrète est marquée 🔑 (à récupérer/coller par toi).
 À la fin, chaque variable a **une seule** destination : le fichier `.env.local` (dev)
@@ -6,12 +6,19 @@ et **Vercel › Settings › Environment Variables** (prod).
 
 ---
 
-## 1. Neon (base de données)
+## 1. Supabase (base de données)
 
-1. Crée un compte sur https://neon.tech → **New Project** (région EU si possible).
-2. Dans **Connection Details**, copie deux chaînes :
-   - 🔑 `DATABASE_URL` → coche **Pooled connection** (finit par `-pooler...`)
-   - 🔑 `DIRECT_URL` → **décoche** Pooled (connexion directe, pour les migrations)
+1. Crée un projet sur https://supabase.com (région EU si possible) et note le
+   **mot de passe de la base** (Database password) demandé à la création.
+2. Barre du haut → bouton **Connect** → onglet **ORMs** (ou **Prisma**). Copie deux chaînes :
+   - 🔑 `DATABASE_URL` = **Transaction pooler** (port **6543**). Ajoute à la fin
+     `?pgbouncer=true&connection_limit=1` (obligatoire en serverless).
+   - 🔑 `DIRECT_URL` = **Session pooler** (port **5432**). Sert aux migrations
+     (`db:push`) — évite la connexion directe `db.[ref].supabase.co` qui est IPv6-only.
+   - Les deux ont la forme `postgresql://postgres.[REF]:[PWD]@aws-0-[REGION].pooler.supabase.com:...`
+
+   > Pas besoin de créer de tables à la main : `npm run db:push` (étape 4) génère
+   > tout le schéma. Utilise Prisma, **pas** le client `supabase-js`.
 
 ---
 
@@ -52,11 +59,11 @@ En local, avec le `.env.local` rempli (mêmes valeurs que Vercel) :
 
 ```bash
 npm install
-npm run db:push     # crée le schéma sur Neon (utilise DIRECT_URL)
+npm run db:push     # crée le schéma sur Supabase (utilise DIRECT_URL)
 npm run db:seed     # admin + contenu de démo
 ```
 
-> `db:push` et `db:seed` visent la **même** base Neon que la prod : tu peux donc
+> `db:push` et `db:seed` visent la **même** base Supabase que la prod : tu peux donc
 > l'exécuter depuis ta machine, pas besoin d'un shell sur Vercel.
 
 Compte admin créé : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
@@ -75,8 +82,8 @@ Compte admin créé : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
 | Variable | Source | 🔑 |
 |---|---|:--:|
 | `JWT_SECRET` | `openssl rand -hex 32` | 🔑 |
-| `DATABASE_URL` | Neon (pooled) | 🔑 |
-| `DIRECT_URL` | Neon (direct) | 🔑 |
+| `DATABASE_URL` | Supabase (transaction pooler 6543) | 🔑 |
+| `DIRECT_URL` | Supabase (session pooler 5432) | 🔑 |
 | `S3_ENDPOINT` | R2 (`https://<id>.r2.cloudflarestorage.com`) | |
 | `S3_REGION` | `auto` | |
 | `S3_BUCKET` | R2 (nom du bucket) | |
