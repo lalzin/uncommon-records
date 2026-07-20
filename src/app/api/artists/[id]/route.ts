@@ -1,20 +1,26 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { json, error } from "@/lib/auth";
-import { serializeUser, serializeTrack } from "@/lib/serializers";
-import { trackInclude } from "@/lib/trackInclude";
+import { serializeUser, serializeTrack, type TrackWithRel } from "@/lib/serializers";
+import { TRACK_SELECT } from "@/lib/trackInclude";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const artist = await prisma.user.findFirst({
-    where: { id: Number(params.id), role: "ARTIST" },
-  });
+  const { data: artist } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", Number(params.id))
+    .eq("role", "ARTIST")
+    .maybeSingle();
   if (!artist) return error("Not found", 404);
 
-  const tracks = await prisma.track.findMany({
-    where: { artistId: artist.id, isPublic: true },
-    include: trackInclude,
-    orderBy: { createdAt: "desc" },
-  });
+  const { data } = await supabase
+    .from("tracks")
+    .select(TRACK_SELECT)
+    .eq("artist_id", artist.id)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false });
+  const tracks = (data ?? []) as unknown as TrackWithRel[];
+
   return json({
     artist: serializeUser(artist),
     tracks: tracks.map((t) => serializeTrack(t)),

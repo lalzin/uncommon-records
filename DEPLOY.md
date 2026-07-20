@@ -10,20 +10,15 @@ et **Vercel › Settings › Environment Variables** (prod).
 
 1. Crée un projet sur https://supabase.com (région EU si possible) et note le
    **mot de passe de la base** (Database password) demandé à la création.
-2. Barre du haut → bouton **Connect** → onglet **ORMs** (ou **Prisma**).
-   - 🔑 `DATABASE_URL` = **Transaction pooler** (port **6543**). Ajoute à la fin
-     `?pgbouncer=true&connection_limit=1` (obligatoire en serverless).
-     Forme : `postgresql://postgres.[REF]:[PWD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?...`
-     → **C'est la seule variable DB requise** (runtime Vercel + seed).
-   - `DIRECT_URL` = **OPTIONNELLE**. Sur Supabase c'est la chaîne « Session pooler »
-     (port **5432**). Elle ne sert qu'à `prisma migrate` / `db push`. Comme on crée le
-     schéma via le SQL Editor (étape suivante), **tu peux la laisser vide**.
-
-   > Utilise Prisma via la connection string, **pas** le client `supabase-js` ni la
-   > *secret API key* (celle-ci ne sert qu'à l'API REST de Supabase, non utilisée ici).
-
+2. **Settings › API** → récupère deux valeurs :
+   - `SUPABASE_URL` = **Project URL** (`https://<ref>.supabase.co`)
+   - 🔑 `SUPABASE_SERVICE_ROLE_KEY` = clé **service_role** (Project API keys) OU la
+     nouvelle **secret key** (`sb_secret_...`). L'app l'utilise côté serveur pour
+     accéder à la base via l'API Supabase. **Serveur uniquement — jamais exposée au
+     navigateur** (elle contourne le RLS).
 3. **Créer les tables** : SQL Editor → New query → colle le contenu de
-   [`infra/schema.sql`](infra/schema.sql) → **Run**. Ça crée les 8 tables + le compte admin.
+   [`infra/schema.sql`](infra/schema.sql) → **Run**. Ça crée les 8 tables + les
+   triggers `updated_at` + le compte admin.
 
 ---
 
@@ -47,10 +42,10 @@ et **Vercel › Settings › Environment Variables** (prod).
 ## 3. Vercel (hébergement)
 
 1. https://vercel.com → **Add New › Project** → importe `lalzin/uncommon-records`.
-   Framework **Next.js** détecté automatiquement (build : `prisma generate && next build`,
+   Framework **Next.js** détecté automatiquement (build : `next build`,
    défini dans `vercel.json`).
 2. **Environment Variables** : colle toutes les clés de `.env.local.template`
-   (JWT_SECRET, DATABASE_URL, DIRECT_URL, S3_*, MAIL_*, FRONTEND_URL, ADMIN_*).
+   (JWT_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, S3_*, MAIL_*, FRONTEND_URL, ADMIN_*).
    - `JWT_SECRET` 🔑 : génère avec `openssl rand -hex 32`
    - `FRONTEND_URL` : mets l'URL Vercel du projet (ex. `https://uncommon-records.vercel.app`)
 3. **Deploy**. Récupère l'URL finale et :
@@ -64,15 +59,14 @@ Les tables sont déjà créées (SQL Editor, étape 1.3) et le compte **admin** 
 Le contenu de **démo** (artistes, morceaux, events, sessions) est optionnel :
 
 - soit tu le crées depuis le **dashboard admin** une fois connecté ;
-- soit tu lances le seed en local (avec `.env.local` rempli, `DATABASE_URL` suffit) :
+- soit tu lances le seed en local (avec `.env.local` rempli : SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) :
 
 ```bash
 npm install
 npm run db:seed     # ajoute admin (si absent) + contenu de démo
 ```
 
-> `db:seed` utilise le Prisma Client → **seul `DATABASE_URL` est nécessaire**
-> (pas de `DIRECT_URL`). Il vise la même base Supabase que la prod.
+> `db:seed` utilise l'API Supabase (service_role) et vise la même base que la prod.
 
 Compte admin : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
 (**change le mot de passe** après la première connexion).
@@ -90,8 +84,8 @@ Compte admin : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
 | Variable | Source | 🔑 |
 |---|---|:--:|
 | `JWT_SECRET` | `openssl rand -hex 32` | 🔑 |
-| `DATABASE_URL` | Supabase (transaction pooler 6543) | 🔑 |
-| `DIRECT_URL` | Supabase (session pooler 5432) — *optionnel, migrations seulement* | |
+| `SUPABASE_URL` | Supabase › Settings › API (Project URL) | |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase › Settings › API (service_role / secret key) | 🔑 |
 | `S3_ENDPOINT` | R2 (`https://<id>.r2.cloudflarestorage.com`) | |
 | `S3_REGION` | `auto` | |
 | `S3_BUCKET` | R2 (nom du bucket) | |

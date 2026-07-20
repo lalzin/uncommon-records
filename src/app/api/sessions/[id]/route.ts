@@ -1,26 +1,27 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { getCurrentUser, json, error } from "@/lib/auth";
 import { serializeSession } from "@/lib/serializers";
 import { buildYoutubeEmbedUrl, buildYoutubeThumbnailUrl } from "@/lib/youtube";
+import type { TableUpdate } from "@/lib/database.types";
 
 type Ctx = { params: { id: string } };
 
 export async function GET(req: NextRequest, { params }: Ctx) {
-  const session = await prisma.session.findUnique({ where: { id: Number(params.id) } });
+  const { data: session } = await supabase.from("sessions").select("*").eq("id", Number(params.id)).maybeSingle();
   if (!session) return error("Not found", 404);
   const user = await getCurrentUser(req);
-  if (!session.isPublished && !(user && user.role === "ADMIN")) return error("Not found", 404);
+  if (!session.is_published && !(user && user.role === "ADMIN")) return error("Not found", 404);
   return json(serializeSession(session));
 }
 
 export async function PUT(req: NextRequest, { params }: Ctx) {
   const user = await getCurrentUser(req);
-  if (!user || !user.isActive) return error("Authentication required", 401);
+  if (!user || !user.is_active) return error("Authentication required", 401);
   if (user.role !== "ADMIN") return error("Insufficient permissions", 403);
 
   const id = Number(params.id);
-  const session = await prisma.session.findUnique({ where: { id } });
+  const { data: session } = await supabase.from("sessions").select("*").eq("id", id).maybeSingle();
   if (!session) return error("Not found", 404);
 
   const data = await req.json().catch(() => ({}));
@@ -36,24 +37,25 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     const youtubeUrl = String(data.youtube_url || "").trim();
     const embedUrl = buildYoutubeEmbedUrl(youtubeUrl);
     if (!youtubeUrl || !embedUrl) return error("Invalid YouTube URL", 400);
-    update.youtubeUrl = youtubeUrl;
-    update.embedUrl = embedUrl;
-    update.thumbnailUrl = buildYoutubeThumbnailUrl(youtubeUrl);
+    update.youtube_url = youtubeUrl;
+    update.embed_url = embedUrl;
+    update.thumbnail_url = buildYoutubeThumbnailUrl(youtubeUrl);
   }
-  if ("is_published" in data) update.isPublished = !!data.is_published;
-  if ("is_featured" in data) update.isFeatured = !!data.is_featured;
-  if ("sort_order" in data) update.sortOrder = Number(data.sort_order || 0);
+  if ("is_published" in data) update.is_published = !!data.is_published;
+  if ("is_featured" in data) update.is_featured = !!data.is_featured;
+  if ("sort_order" in data) update.sort_order = Number(data.sort_order || 0);
 
-  const updated = await prisma.session.update({ where: { id }, data: update });
-  return json(serializeSession(updated));
+  const { data: updated } = await supabase.from("sessions").update(update as TableUpdate<"sessions">).eq("id", id).select("*").single();
+  return json(serializeSession(updated!));
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
   const user = await getCurrentUser(req);
-  if (!user || !user.isActive) return error("Authentication required", 401);
+  if (!user || !user.is_active) return error("Authentication required", 401);
   if (user.role !== "ADMIN") return error("Insufficient permissions", 403);
   const id = Number(params.id);
-  if (!(await prisma.session.findUnique({ where: { id } }))) return error("Not found", 404);
-  await prisma.session.delete({ where: { id } });
+  const { data: session } = await supabase.from("sessions").select("id").eq("id", id).maybeSingle();
+  if (!session) return error("Not found", 404);
+  await supabase.from("sessions").delete().eq("id", id);
   return json({ message: "Deleted" });
 }

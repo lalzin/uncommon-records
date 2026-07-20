@@ -1,18 +1,30 @@
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { json } from "@/lib/auth";
 import { serializeUser } from "@/lib/serializers";
 
-// API routes must never be prerendered at build time (they hit the DB at request time).
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const artists = await prisma.user.findMany({
-    where: { role: "ARTIST", isActive: true },
-    include: { _count: { select: { tracks: { where: { isPublic: true } } } } },
-  });
-  const result = artists.map((a) => ({
+  const { data: artists } = await supabase
+    .from("users")
+    .select("*")
+    .eq("role", "ARTIST")
+    .eq("is_active", true);
+
+  const ids = (artists ?? []).map((a) => a.id);
+  const counts = new Map<number, number>();
+  if (ids.length) {
+    const { data: tracks } = await supabase
+      .from("tracks")
+      .select("artist_id")
+      .eq("is_public", true)
+      .in("artist_id", ids);
+    for (const t of tracks ?? []) counts.set(t.artist_id, (counts.get(t.artist_id) ?? 0) + 1);
+  }
+
+  const result = (artists ?? []).map((a) => ({
     ...serializeUser(a),
-    track_count: a._count.tracks,
+    track_count: counts.get(a.id) ?? 0,
   }));
   return json({ artists: result });
 }

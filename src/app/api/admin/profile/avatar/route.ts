@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { requireRole, json, error } from "@/lib/auth";
 import { allowedFile, saveImage, deleteFile, IMAGE_EXT } from "@/lib/storage";
 
@@ -10,6 +10,6 @@ export const POST = requireRole("ADMIN", "ARTIST")(async (req, { user }) => {
 
   await deleteFile(user.avatar);
   const avatar = await saveImage(file, "avatars", [400, 400]);
-  await prisma.user.update({ where: { id: user.id }, data: { avatar } });
+  await supabase.from("users").update({ avatar }).eq("id", user.id);
   return json({ avatar });
 });

@@ -19,7 +19,7 @@ CREATE TABLE "users" (
     "social_links" JSONB,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -43,7 +43,7 @@ CREATE TABLE "tracks" (
     "soundcloud_url" TEXT,
     "beatport_url" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "artist_id" INTEGER NOT NULL,
 
     CONSTRAINT "tracks_pkey" PRIMARY KEY ("id")
@@ -65,7 +65,7 @@ CREATE TABLE "events" (
     "is_published" BOOLEAN NOT NULL DEFAULT false,
     "is_featured" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "events_pkey" PRIMARY KEY ("id")
 );
@@ -82,7 +82,7 @@ CREATE TABLE "sessions" (
     "is_featured" BOOLEAN NOT NULL DEFAULT false,
     "sort_order" INTEGER NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
 );
@@ -154,6 +154,18 @@ ALTER TABLE "downloads" ADD CONSTRAINT "downloads_user_id_fkey" FOREIGN KEY ("us
 ALTER TABLE "downloads" ADD CONSTRAINT "downloads_track_id_fkey" FOREIGN KEY ("track_id") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "invite_tokens" ADD CONSTRAINT "invite_tokens_track_id_fkey" FOREIGN KEY ("track_id") REFERENCES "tracks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "invite_tokens" ADD CONSTRAINT "invite_tokens_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- Auto-remplissage de updated_at à chaque UPDATE (remplace le @updatedAt de Prisma)
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER users_set_updated_at    BEFORE UPDATE ON "users"    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER tracks_set_updated_at   BEFORE UPDATE ON "tracks"   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER events_set_updated_at   BEFORE UPDATE ON "events"   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER sessions_set_updated_at BEFORE UPDATE ON "sessions" FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Compte admin par défaut (mot de passe : UncommonAdmin2024! — bcrypt)

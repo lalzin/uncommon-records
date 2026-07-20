@@ -1,18 +1,26 @@
 import { randomBytes } from "crypto";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { requireRole, hashPassword, json, error } from "@/lib/auth";
 import { serializeUser } from "@/lib/serializers";
 import { allowedFile, saveImage, IMAGE_EXT } from "@/lib/storage";
 
 export const GET = requireRole("ADMIN")(async () => {
-  const artists = await prisma.user.findMany({
-    where: { role: "ARTIST" },
-    orderBy: { name: "asc" },
-    include: { _count: { select: { tracks: true } } },
-  });
-  const result = artists.map((a) => ({
+  const { data: artists } = await supabase
+    .from("users")
+    .select("*")
+    .eq("role", "ARTIST")
+    .order("name", { ascending: true });
+
+  const ids = (artists ?? []).map((a) => a.id);
+  const counts = new Map<number, number>();
+  if (ids.length) {
+    const { data: tracks } = await supabase.from("tracks").select("artist_id").in("artist_id", ids);
+    for (const t of tracks ?? []) counts.set(t.artist_id, (counts.get(t.artist_id) ?? 0) + 1);
+  }
+
+  const result = (artists ?? []).map((a) => ({
     ...serializeUser(a, true),
-    track_count: a._count.tracks,
+    track_count: counts.get(a.id) ?? 0,
   }));
   return json({ artists: result });
 });
@@ -27,8 +35,9 @@ export const POST = requireRole("ADMIN")(async (req) => {
   const name = str("name");
   const email = str("email").toLowerCase();
   if (!name || !email) return error("name and email are required", 400);
-  if (await prisma.user.findUnique({ where: { email } }))
-    return error("Email already in use", 409);
+
+  const { data: existing } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+  if (existing) return error("Email already in use", 409);
 
   const socialLinks = {
     instagram: str("instagram"),
@@ -44,17 +53,21 @@ export const POST = requireRole("ADMIN")(async (req) => {
   }
 
   const password = str("password") || randomBytes(16).toString("base64url");
-  const artist = await prisma.user.create({
-    data: {
+  const { data: artist, error: insErr } = await supabase
+    .from("users")
+    .insert({
       name,
       email,
       role: "ARTIST",
       bio: str("bio"),
-      socialLinks,
-      isActive: true,
+      social_links: socialLinks,
+      is_active: true,
       avatar,
-      passwordHash: await hashPassword(password),
-    },
-  });
+      password_hash: await hashPassword(password),
+    })
+    .select("*")
+    .single();
+  if (insErr || !artist) return error(insErr?.message || "Create failed", 500);
+
   return json(serializeUser(artist, true), 201);
 });

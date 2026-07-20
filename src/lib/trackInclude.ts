@@ -1,10 +1,8 @@
-import type { Prisma } from "@prisma/client";
-import { prisma } from "./prisma";
+import { supabase } from "./supabase";
 
-export const trackInclude = {
-  artist: true,
-  _count: { select: { likes: true, comments: true } },
-} satisfies Prisma.TrackInclude;
+// PostgREST select string: track + its artist (many-to-one) + aggregated counts.
+export const TRACK_SELECT =
+  "*, artist:users!tracks_artist_id_fkey(*), likes(count), comments(count)";
 
 /** Returns a Set of trackIds the user has liked, among the given ids. */
 export async function likedTrackIds(
@@ -12,9 +10,10 @@ export async function likedTrackIds(
   trackIds: number[],
 ): Promise<Set<number>> {
   if (!userId || trackIds.length === 0) return new Set();
-  const rows = await prisma.like.findMany({
-    where: { userId, trackId: { in: trackIds } },
-    select: { trackId: true },
-  });
-  return new Set(rows.map((r) => r.trackId));
+  const { data } = await supabase
+    .from("likes")
+    .select("track_id")
+    .eq("user_id", userId)
+    .in("track_id", trackIds);
+  return new Set((data ?? []).map((r) => r.track_id));
 }

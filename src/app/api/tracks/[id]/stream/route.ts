@@ -1,12 +1,16 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { json, error } from "@/lib/auth";
 import { publicUrl } from "@/lib/storage";
 
 // Returns a playable URL. Audio lives in the object store (or a remote demo URL).
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const track = await prisma.track.findUnique({ where: { id: Number(params.id) } });
+  const { data: track } = await supabase
+    .from("tracks")
+    .select("audio_file, is_public")
+    .eq("id", Number(params.id))
+    .maybeSingle();
   if (!track) return error("Not found", 404);
-  if (!track.isPublic) return error("Not found", 404);
-  return json({ stream_url: publicUrl(track.audioFile) });
+  if (!track.is_public) return error("Not found", 404);
+  return json({ stream_url: publicUrl(track.audio_file) });
 }

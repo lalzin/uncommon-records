@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import { checkPassword, generateToken, json, error } from "@/lib/auth";
 import { serializeUser } from "@/lib/serializers";
 
@@ -10,10 +10,15 @@ export async function POST(req: NextRequest) {
 
   if (!email || !password) return error("Email and password required", 400);
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await checkPassword(password, user.passwordHash)))
+  const { data: user } = await supabase
+    .from("users")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (!user || !(await checkPassword(password, user.password_hash)))
     return error("Invalid credentials", 401);
-  if (!user.isActive) return error("Account disabled", 403);
+  if (!user.is_active) return error("Account disabled", 403);
 
   return json({
     token: await generateToken(user.id, user.role),

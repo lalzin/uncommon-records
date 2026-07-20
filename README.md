@@ -3,7 +3,8 @@
 Réécriture de l'application Flask `uncommon-records` en **Next.js 14 (App Router, TypeScript)**,
 déployable sur **Vercel**, avec :
 
-- **Supabase** (Postgres) à la place de SQLite — via **Prisma**
+- **Supabase** à la place de SQLite — accès via l'**API Supabase** (`@supabase/supabase-js`,
+  clé service_role côté serveur), schéma créé via le SQL Editor
 - **S3 / Cloudflare R2** à la place du dossier `uploads/` local — gros fichiers audio uploadés
   en **direct-to-bucket** via URL présignée (contourne la limite de 4,5 Mo des fonctions serverless)
 - **JWT** (`jose`) + **bcrypt** pour l'auth, identique au comportement Flask
@@ -17,14 +18,14 @@ résolus ainsi :
 
 | Contrainte Vercel | Original (Flask) | Ici |
 |---|---|---|
-| Pas de FS persistant pour la DB | SQLite `instance/uncommon.db` | Supabase Postgres (`DATABASE_URL`) |
+| Pas de FS persistant pour la DB | SQLite `instance/uncommon.db` | Supabase (API, clé service_role) |
 | Pas de FS persistant pour les fichiers | `uploads/` local | Bucket S3/R2 + URLs présignées |
 | Limite de taille du body serverless | upload audio 150 Mo en POST | upload direct navigateur → bucket |
 
 ## Stack
 
 - Next.js 14 · React 18 · TypeScript
-- Prisma 5 (`@prisma/client`)
+- `@supabase/supabase-js` (accès data via l'API, clé service_role)
 - `@aws-sdk/client-s3` + `s3-request-presigner`
 - `sharp` (redimensionnement images → webp, équivalent Pillow)
 - `jose`, `bcryptjs`, `nodemailer`
@@ -33,11 +34,13 @@ résolus ainsi :
 
 ```text
 uncommon-records-vercel/
-  prisma/
-    schema.prisma        # 8 modèles portés (User, Track, Event, Session, Comment, Like, Download, InviteToken)
-    seed.ts              # port de run.py : admin + contenu de démo
+  infra/
+    schema.sql           # DDL des 8 tables + triggers + admin (à coller dans le SQL Editor Supabase)
+    r2-cors.json         # politique CORS R2
+  scripts/
+    seed.ts              # admin + contenu de démo (via l'API Supabase)
   src/
-    lib/                 # prisma, auth (jwt/bcrypt), storage (s3/r2), serializers, mail, youtube
+    lib/                 # supabase (client + types), auth (jwt/bcrypt), storage (s3/r2), serializers, mail, youtube
     app/
       api/               # tous les endpoints REST (route handlers)
       page.tsx           # accueil
@@ -53,8 +56,8 @@ uncommon-records-vercel/
 ```bash
 npm install
 cp .env.example .env.local      # puis renseigner les valeurs
-npx prisma db push              # crée le schéma sur Supabase
-npm run db:seed                 # admin + données de démo
+# Créer les tables : coller infra/schema.sql dans Supabase › SQL Editor › Run
+npm run db:seed                 # admin + données de démo (via l'API Supabase)
 npm run dev                     # http://localhost:3000
 ```
 
@@ -62,25 +65,24 @@ npm run dev                     # http://localhost:3000
 
 Voir `.env.example`. Les essentielles :
 
-- `DATABASE_URL` (Supabase **transaction pooler** 6543) + `DIRECT_URL` (Supabase **session pooler** 5432)
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (Supabase › Settings › API — clé **serveur only**)
 - `S3_*` : `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL`,
   et pour R2 : `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com` + `S3_REGION=auto`
 - `JWT_SECRET`, `FRONTEND_URL`, `MAIL_*`
 
 ## Déploiement Vercel
 
-1. **Supabase** : créer un projet, récupérer les connection strings (transaction + session pooler).
+1. **Supabase** : créer un projet, coller `infra/schema.sql` dans le SQL Editor,
+   récupérer `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (Settings › API).
 2. **Bucket** : créer un bucket S3 (ou R2). Le rendre lisible publiquement OU servir via CDN, et
    renseigner `S3_PUBLIC_BASE_URL`. Configurer le **CORS** du bucket pour autoriser les `PUT`
    présignés depuis votre domaine (`PUT`, `GET`, headers `*`, origine = votre URL Vercel).
 3. **Import** du repo dans Vercel → framework détecté : Next.js.
 4. Renseigner les variables d'environnement (mêmes clés que `.env.example`).
-5. Build command (déjà dans `vercel.json`) : `prisma generate && next build`.
-6. Après le premier déploiement, lancer une fois le schéma + seed :
-   ```bash
-   npx prisma db push      # ou: prisma migrate deploy
-   npm run db:seed
-   ```
+5. Build command (déjà dans `vercel.json`) : `next build`.
+6. Contenu de démo (optionnel) : `npm run db:seed` en local.
+
+Voir **[DEPLOY.md](DEPLOY.md)** pour le guide détaillé pas-à-pas.
 
 ## Mapping API (Flask → Next.js)
 
@@ -113,7 +115,7 @@ La base de démo (`instance/uncommon.db`, ~49 Ko) est négligeable : le seed la 
 Pour migrer une vraie base SQLite de prod :
 
 1. exporter les tables SQLite → CSV / SQL,
-2. importer dans Supabase (mêmes noms de colonnes : voir `@map(...)` dans `schema.prisma`),
+2. importer dans Supabase (mêmes noms de colonnes : voir `infra/schema.sql`),
 3. uploader les fichiers de `backend/uploads/**` vers le bucket en conservant les chemins
    `covers/…`, `events/…`, `avatars/…`, `audio/…` (les clés stockées en base correspondent).
 
