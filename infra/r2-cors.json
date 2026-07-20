@@ -1,0 +1,12 @@
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "https://REMPLACER-PAR-VOTRE-DOMAINE.vercel.app"
+    ],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
