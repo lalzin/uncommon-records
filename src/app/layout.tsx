@@ -1,7 +1,22 @@
 import type { Metadata } from "next";
+import { Syne, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import Newsletter from "@/components/Newsletter";
+import SiteFooter from "@/components/SiteFooter";
+
+// Self-hosted via next/font — no external @import (CSP-safe, always loads).
+const display = Syne({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-display",
+  display: "swap",
+});
+const body = Hanken_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Uncommon Records — Electronic Music Label · Rennes",
@@ -11,23 +26,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className={`${display.variable} ${body.variable}`}>
       <body>
+        <div className="grain" aria-hidden />
+        <div className="bg-glow" aria-hidden />
         <Navbar />
         <main>{children}</main>
-        <footer
-          className="container"
-          style={{ padding: "3rem 0", borderTop: "1px solid var(--color-border)", marginTop: "4rem" }}
-        >
-          <h3 style={{ fontSize: "1.1rem" }}>Newsletter</h3>
-          <p className="text-muted" style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>
-            Releases, shows et annonces du label.
-          </p>
-          <Newsletter />
-          <p style={{ color: "var(--color-text-faint)", fontSize: "0.8rem", marginTop: "2rem" }}>
-            © {new Date().getFullYear()} Uncommon Records — Rennes
-          </p>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

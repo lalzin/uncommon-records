@@ -13,23 +13,20 @@ interface SessionItem {
 
 function SessionCard({ item, featured }: { item: SessionItem; featured?: boolean }) {
   return (
-    <article className="surface" style={{ overflow: "hidden", gridColumn: featured ? "1 / -1" : undefined }}>
-      <div style={{ position: "relative", aspectRatio: "16 / 9" }}>
+    <article className="card rise ses" style={featured ? { gridColumn: "1 / -1" } : undefined}>
+      <div className="ses-frame">
         <iframe
           src={item.embed_url}
           title={item.title}
           loading="lazy"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
         />
       </div>
-      <div style={{ padding: "1.25rem" }}>
-        <div style={{ fontSize: "0.7rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--color-gold)" }}>
-          {featured ? "Session mise en avant" : "Session vidéo"}
-        </div>
-        <h2 style={{ fontSize: "1.3rem", margin: "0.4rem 0" }}>{item.title}</h2>
-        <p className="text-muted" style={{ fontSize: "0.9rem" }}>
+      <div className="ses-body">
+        <span className="eyebrow">{featured ? "Session mise en avant" : "Session vidéo"}</span>
+        <h2 className="ses-title">{item.title}</h2>
+        <p className="text-muted" style={{ fontSize: "0.92rem" }}>
           {item.description || "Session vidéo Uncommon Records."}
         </p>
       </div>
@@ -54,23 +51,35 @@ export default function SessionsPage() {
 
   return (
     <div className="container section">
-      <div className="badge">Vidéos</div>
-      <h1 className="display-lg" style={{ margin: "1rem 0 2.5rem" }}>
-        Sessions
-      </h1>
+      <header className="page-head">
+        <span className="badge">Vidéos</span>
+        <h1 className="section-title">Sessions</h1>
+        <p className="lead">Sets et captations vidéo dans l&apos;esthétique du label.</p>
+      </header>
 
       {loading ? (
         <p className="text-muted">Chargement…</p>
       ) : items.length === 0 ? (
-        <p className="text-muted">Aucune session publiée pour l&apos;instant.</p>
+        <div className="empty">
+          <span className="empty-mark">▶</span>
+          <p style={{ fontWeight: 600, color: "var(--text)" }}>Aucune session publiée pour l&apos;instant.</p>
+        </div>
       ) : (
-        <div className="grid-auto">
+        <div className="ses-grid">
           {featured && <SessionCard item={featured} featured />}
           {rest.map((i) => (
             <SessionCard key={i.id} item={i} />
           ))}
         </div>
       )}
+
+      <style>{`
+        .ses-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: clamp(1rem, 2vw, 1.75rem); }
+        .ses-frame { position: relative; aspect-ratio: 16 / 9; }
+        .ses-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .ses-body { padding: 1.25rem 1.35rem 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .ses-title { font-size: 1.35rem; letter-spacing: -0.02em; }
+      `}</style>
     </div>
   );
 }
