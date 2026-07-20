@@ -10,15 +10,20 @@ et **Vercel › Settings › Environment Variables** (prod).
 
 1. Crée un projet sur https://supabase.com (région EU si possible) et note le
    **mot de passe de la base** (Database password) demandé à la création.
-2. Barre du haut → bouton **Connect** → onglet **ORMs** (ou **Prisma**). Copie deux chaînes :
+2. Barre du haut → bouton **Connect** → onglet **ORMs** (ou **Prisma**).
    - 🔑 `DATABASE_URL` = **Transaction pooler** (port **6543**). Ajoute à la fin
      `?pgbouncer=true&connection_limit=1` (obligatoire en serverless).
-   - 🔑 `DIRECT_URL` = **Session pooler** (port **5432**). Sert aux migrations
-     (`db:push`) — évite la connexion directe `db.[ref].supabase.co` qui est IPv6-only.
-   - Les deux ont la forme `postgresql://postgres.[REF]:[PWD]@aws-0-[REGION].pooler.supabase.com:...`
+     Forme : `postgresql://postgres.[REF]:[PWD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?...`
+     → **C'est la seule variable DB requise** (runtime Vercel + seed).
+   - `DIRECT_URL` = **OPTIONNELLE**. Sur Supabase c'est la chaîne « Session pooler »
+     (port **5432**). Elle ne sert qu'à `prisma migrate` / `db push`. Comme on crée le
+     schéma via le SQL Editor (étape suivante), **tu peux la laisser vide**.
 
-   > Pas besoin de créer de tables à la main : `npm run db:push` (étape 4) génère
-   > tout le schéma. Utilise Prisma, **pas** le client `supabase-js`.
+   > Utilise Prisma via la connection string, **pas** le client `supabase-js` ni la
+   > *secret API key* (celle-ci ne sert qu'à l'API REST de Supabase, non utilisée ici).
+
+3. **Créer les tables** : SQL Editor → New query → colle le contenu de
+   [`infra/schema.sql`](infra/schema.sql) → **Run**. Ça crée les 8 tables + le compte admin.
 
 ---
 
@@ -55,19 +60,22 @@ et **Vercel › Settings › Environment Variables** (prod).
 
 ## 4. Initialiser la base (une seule fois)
 
-En local, avec le `.env.local` rempli (mêmes valeurs que Vercel) :
+Les tables sont déjà créées (SQL Editor, étape 1.3) et le compte **admin** aussi.
+Le contenu de **démo** (artistes, morceaux, events, sessions) est optionnel :
+
+- soit tu le crées depuis le **dashboard admin** une fois connecté ;
+- soit tu lances le seed en local (avec `.env.local` rempli, `DATABASE_URL` suffit) :
 
 ```bash
 npm install
-npm run db:push     # crée le schéma sur Supabase (utilise DIRECT_URL)
-npm run db:seed     # admin + contenu de démo
+npm run db:seed     # ajoute admin (si absent) + contenu de démo
 ```
 
-> `db:push` et `db:seed` visent la **même** base Supabase que la prod : tu peux donc
-> l'exécuter depuis ta machine, pas besoin d'un shell sur Vercel.
+> `db:seed` utilise le Prisma Client → **seul `DATABASE_URL` est nécessaire**
+> (pas de `DIRECT_URL`). Il vise la même base Supabase que la prod.
 
-Compte admin créé : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
-(**change le mot de passe** via `ADMIN_PASSWORD` avant le seed en prod réelle).
+Compte admin : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
+(**change le mot de passe** après la première connexion).
 
 ---
 
@@ -83,7 +91,7 @@ Compte admin créé : `admin@uncommon-records.fr` / `UncommonAdmin2024!`
 |---|---|:--:|
 | `JWT_SECRET` | `openssl rand -hex 32` | 🔑 |
 | `DATABASE_URL` | Supabase (transaction pooler 6543) | 🔑 |
-| `DIRECT_URL` | Supabase (session pooler 5432) | 🔑 |
+| `DIRECT_URL` | Supabase (session pooler 5432) — *optionnel, migrations seulement* | |
 | `S3_ENDPOINT` | R2 (`https://<id>.r2.cloudflarestorage.com`) | |
 | `S3_REGION` | `auto` | |
 | `S3_BUCKET` | R2 (nom du bucket) | |
