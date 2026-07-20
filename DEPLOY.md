@@ -17,13 +17,12 @@ et **Vercel › Settings › Environment Variables** (prod).
 
 ## 2. Cloudflare R2 (fichiers)
 
-1. Cloudflare Dashboard → **R2** → **Create bucket** : nom `uncommon-uploads`.
-   → renseigne `S3_BUCKET=uncommon-uploads`.
+   Bucket déjà créé : **`uncommonrecords`** → `S3_BUCKET=uncommonrecords`.
+   Endpoint (compte `6864227c...`) : `S3_ENDPOINT=https://6864227c9aced9e1d70dc269f2f65b83.r2.cloudflarestorage.com`
+   ⚠️ l'endpoint ne contient **pas** `/uncommonrecords` (le SDK ajoute le bucket). Garde `S3_REGION=auto`.
 2. **R2 › Manage R2 API Tokens › Create API token** → *Object Read & Write* :
    - 🔑 `S3_ACCESS_KEY_ID`
    - 🔑 `S3_SECRET_ACCESS_KEY`
-   - l'écran affiche aussi l'endpoint S3 : `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-     → renseigne `S3_ENDPOINT` (garde `S3_REGION=auto`).
 3. **Accès public** (pour servir covers/audio) : bucket → **Settings › Public access** →
    active le domaine **r2.dev** (ou branche un domaine custom).
    → 🔑 `S3_PUBLIC_BASE_URL=https://pub-XXXX.r2.dev`
